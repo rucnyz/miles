@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # 第一步：构建 CUDA 13 基础镜像
+  base:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        - ENABLE_CUDA_13=1
+    image: slime-cuda13-base
+
+  # 第二步：基于 base 添加 SSH 配置
+  slime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BASE_IMAGE=slime-cuda13-base
+    depends_on:
+      - base
+    container_name: slime_yuzhou
+    ports:
+      - "${SSH_PORT:-2222}:22"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+#      - /home/yineng/shared_model:/root/.cache
+    privileged: true
+    ipc: host
+    shm_size: 16g
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      stack:
+        soft: 67108864
+        hard: 67108864
+      nofile:
+        soft: 65536
+        hard: 65536
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    restart: unless-stopped

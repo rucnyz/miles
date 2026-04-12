@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  slime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GH_USER: ${GH_USER}
+        GH_TOKEN: ${GH_TOKEN}
+    container_name: slime_yuzhou
+    ports:
+      - "${SSH_PORT:-2222}:2222"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../:/root/slime
+#      - /home/yineng/shared_model:/root/.cache
+    privileged: true
+    ipc: host
+    shm_size: 16g
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      stack:
+        soft: 67108864
+        hard: 67108864
+      nofile:
+        soft: 65536
+        hard: 65536
+    runtime: nvidia
+    env_file:
+      - .env
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    restart: unless-stopped
