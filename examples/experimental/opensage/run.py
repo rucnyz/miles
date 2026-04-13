@@ -58,8 +58,8 @@ def main():
     parser.add_argument("--model-name", default=os.getenv("AGENT_MODEL_NAME", "model"))
     parser.add_argument("--dataset-path", default=os.getenv("OPENSAGE_DATASET_PATH", ""),
                         help="Dataset path for Evaluation (e.g. 'swebench' for harbor auto-download)")
-    parser.add_argument("--hf-checkpoint", default="/root/GLM-4.7-Flash",
-                        help="Local model path or HuggingFace model name")
+    parser.add_argument("--hf-checkpoint", default="zai-org/GLM-4.7-Flash",
+                        help="HuggingFace model name or local path")
     parser.add_argument("--skip-prepare", action="store_true",
                         help="Skip model checkpoint conversion")
     parser.add_argument("--skip-cleanup", action="store_true")
