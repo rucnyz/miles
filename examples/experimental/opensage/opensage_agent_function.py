@@ -1,12 +1,9 @@
 """
-Custom agent function for Miles agentic_tool_call.generate.
+Custom agent function and reward for Miles <-> OpenSage integration.
 
-Dispatches to an OpenSage agent and returns reward + metrics.
-OpenSage runs the agent using Miles' session server as the LLM endpoint,
-so Miles automatically records all tokens via TITO.
-
-Usage:
-    --custom-agent-function-path examples.experimental.opensage.opensage_agent_function.run
+Usage in run.py:
+    --custom-agent-function-path opensage_agent_function.run
+    --custom-rm-path opensage_agent_function.reward_func
 
 Environment variables:
     OPENSAGE_AGENT_NAME:     Agent name (default: vul_agent_static_tools)
@@ -19,15 +16,27 @@ import logging
 import os
 from typing import Any
 
+from miles.utils.types import Sample
+
 logger = logging.getLogger(__name__)
 
-# Lazy-initialized client (one per process)
+# -- Reward --
+
+
+async def reward_func(args, samples: Sample | list[Sample], **kwargs) -> float | list[float]:
+    """Reward is pre-computed by OpenSage evaluation during generate()."""
+    if isinstance(samples, list):
+        return [s.metadata.get("reward", 0.0) for s in samples]
+    return samples.metadata.get("reward", 0.0)
+
+
+# -- Agent function --
+
 _client = None
 _client_lock = asyncio.Lock()
 
 
 async def _get_client():
-    """Get or create the OpenSage client (singleton per process)."""
     global _client
     if _client is not None:
         return _client
@@ -64,18 +73,8 @@ async def run(
     """Run an OpenSage agent on a single task instance.
 
     Called by Miles' agentic_tool_call.generate(). The base_url points to
-    Miles' session server, which proxies LLM calls to sglang while recording
+    Miles' session server which proxies LLM calls to sglang while recording
     tokens for TITO training.
-
-    Args:
-        base_url: Miles session server endpoint
-        prompt: Task prompt (string or chat messages)
-        request_kwargs: Sampling parameters
-        metadata: Task metadata from Miles sample
-        **kwargs: Additional arguments (ignored)
-
-    Returns:
-        dict with {reward, exit_status, agent_metrics, eval_report}
     """
     metadata = metadata or {}
     request_kwargs = request_kwargs or {}

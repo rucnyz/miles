@@ -1,0 +1,21 @@
+# Debug config — small batch for quick pipeline verification
+# Usage: python run.py --config configs/debug.yaml
+
+hf-checkpoint: zai-org/GLM-4.7-Flash
+ref-load: /root/GLM-4.7-Flash_torch_dist
+save: /root/GLM-4.7-Flash_opensage_debug/
+save-interval: 100
+
+prompt-data: /root/swe.jsonl
+input-key: prompt
+metadata-key: metadata
+num-rollout: 50
+rollout-batch-size: 2
+n-samples-per-prompt: 2
+rollout-temperature: 0.8
+rollout-max-response-len: 4096
+max-seq-len: 8192
+global-batch-size: 4
+balance-data: true
+
+debug-rollout-only: true

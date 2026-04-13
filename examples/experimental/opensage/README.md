@@ -1,6 +1,6 @@
 # OpenSage: Agent-Environment RL Training with ADK
 
-Integrates [OpenSage](https://github.com/opensage-agent/opensage-adk-dev) agents with Miles' GRPO training pipeline. Uses **TITO (Token In Token Out)** for exact token-level training signals — Miles handles all token tracking externally, so OpenSage only needs to run the agent and return a reward.
+Integrates [OpenSage](https://github.com/opensage-agent/opensage-adk) agents with Miles' GRPO training pipeline. Uses **TITO (Token In Token Out)** for exact token-level training signals — Miles handles all token tracking externally, so OpenSage only needs to run the agent and return a reward.
 
 ## Architecture
 

@@ -213,58 +213,41 @@ async def test_agent_function_interface():
 # ── Test: generate.py reward_func ──────────────────────────────────────────
 
 async def test_reward_func():
-    """Verify generate.py reward_func extracts reward from metadata."""
+    """Verify reward_func extracts reward from metadata."""
     logger.info("=" * 60)
-    logger.info("Test 4: generate.reward_func()")
+    logger.info("Test 4: opensage_agent_function.reward_func()")
     logger.info("=" * 60)
 
     try:
-        # Import reward_func directly, avoiding miles' heavy imports
+        # Load reward_func directly, stub out miles.utils.types
         import importlib.util, sys
-        spec = importlib.util.spec_from_file_location(
-            "generate_mod",
-            str(Path(__file__).parent / "generate.py"),
-            submodule_search_locations=[],
-        )
-        # Stub out miles.utils.types and miles.rollout.* to avoid torch/ray deps
-        for stub in [
-            "miles", "miles.utils", "miles.utils.types",
-            "miles.rollout", "miles.rollout.base_types",
-            "miles.rollout.inference_rollout",
-            "miles.rollout.inference_rollout.inference_rollout_common",
-        ]:
+        for stub in ["miles", "miles.utils", "miles.utils.types"]:
             if stub not in sys.modules:
                 sys.modules[stub] = type(sys)("stub")
 
-        # Provide Sample and InferenceRolloutFn stubs
         class _StubSample:
             def __init__(self):
                 self.metadata = {}
         sys.modules["miles.utils.types"].Sample = _StubSample
 
-        class _StubRolloutFn:
-            pass
-        sys.modules["miles.rollout.base_types"].RolloutFnTrainInput = None
-        sys.modules["miles.rollout.base_types"].RolloutFnTrainOutput = None
-        sys.modules["miles.rollout.inference_rollout.inference_rollout_common"].InferenceRolloutFn = _StubRolloutFn
-
+        spec = importlib.util.spec_from_file_location(
+            "agent_func",
+            str(Path(__file__).parent / "opensage_agent_function.py"),
+        )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         reward_func = mod.reward_func
     except Exception as e:
-        logger.info(f"  SKIPPED (missing dep: {e})")
+        logger.info(f"  SKIPPED ({e})")
         return
 
-    # Mock sample with metadata
     class MockSample:
         def __init__(self, reward):
             self.metadata = {"reward": reward}
 
-    # Single sample
     r = await reward_func(None, MockSample(0.75))
     assert r == 0.75, f"Expected 0.75, got {r}"
 
-    # Batch of samples
     batch = [MockSample(0.5), MockSample(1.0), MockSample(0.0)]
     rs = await reward_func(None, batch)
     assert rs == [0.5, 1.0, 0.0], f"Expected [0.5, 1.0, 0.0], got {rs}"
@@ -272,6 +255,34 @@ async def test_reward_func():
     logger.info(f"  Single: reward={r}")
     logger.info(f"  Batch:  rewards={rs}")
     logger.info(f"  OK: reward_func correctly extracts from metadata")
+
+
+async def test_yaml_config():
+    """Verify YAML config parsing produces correct CLI args."""
+    logger.info("=" * 60)
+    logger.info("Test 5: YAML config parsing")
+    logger.info("=" * 60)
+
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "run_mod",
+        str(Path(__file__).parent / "run.py"),
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    config_path = Path(__file__).parent / "configs" / "debug.yaml"
+    args = mod.parse_yaml_to_args(str(config_path))
+
+    assert "--num-rollout" in args, f"Missing --num-rollout in {args}"
+    idx = args.index("--num-rollout")
+    assert args[idx + 1] == "50", f"Expected 50, got {args[idx + 1]}"
+
+    assert "--debug-rollout-only" in args, "Missing --debug-rollout-only flag"
+    assert "--rollout-shuffle" not in args, "rollout-shuffle should not be in debug config"
+
+    logger.info(f"  Parsed {len(args)} args from debug.yaml")
+    logger.info(f"  OK: YAML config correctly converted to CLI args")
 
 
 # ── Main ───────────────────────────────────────────────────────────────────
@@ -299,6 +310,7 @@ async def main():
         ("Mock endpoint", test_mock_endpoint(port)),
         ("Agent function interface", test_agent_function_interface()),
         ("reward_func", test_reward_func()),
+        ("YAML config parsing", test_yaml_config()),
     ]
 
     for name, coro in tests:

@@ -1,0 +1,73 @@
+# Default training config for OpenSage + Miles (GLM-4.7-Flash)
+# Override via CLI: python run.py --config configs/default.yaml --lr 5e-7
+
+# -- Checkpoints --
+hf-checkpoint: zai-org/GLM-4.7-Flash
+ref-load: /root/GLM-4.7-Flash_torch_dist
+save: /root/GLM-4.7-Flash_opensage/
+save-interval: 100
+
+# -- Data --
+prompt-data: /root/swe.jsonl
+input-key: prompt
+metadata-key: metadata
+rollout-shuffle: true
+num-rollout: 3000
+rollout-batch-size: 2
+n-samples-per-prompt: 4
+rollout-temperature: 0.8
+rollout-max-response-len: 8192
+max-seq-len: 16384
+global-batch-size: 8
+balance-data: true
+
+# -- Parallelism --
+tensor-model-parallel-size: 4
+sequence-parallel: true
+pipeline-model-parallel-size: 1
+context-parallel-size: 1
+expert-model-parallel-size: 8
+expert-tensor-parallel-size: 1
+
+# -- Performance --
+recompute-granularity: full
+recompute-method: uniform
+recompute-num-layers: 1
+use-dynamic-batch-size: true
+max-tokens-per-gpu: 16384
+optimizer-cpu-offload: true
+overlap-cpu-optimizer-d2h-h2d: true
+use-precision-aware-optimizer: true
+
+# -- GRPO --
+advantage-estimator: grpo
+use-kl-loss: true
+kl-loss-coef: 0.01
+kl-loss-type: low_var_kl
+entropy-coef: 0.0
+eps-clip: 0.2
+eps-clip-high: 0.28
+
+# -- Optimizer --
+optimizer: adam
+lr: 1e-6
+lr-decay-style: constant
+weight-decay: 0.1
+adam-beta1: 0.9
+adam-beta2: 0.98
+
+# -- SGLang --
+rollout-num-gpus-per-engine: 1
+sglang-mem-fraction-static: 0.7
+sglang-tool-call-parser: glm47
+sglang-reasoning-parser: glm45
+use-miles-router: true
+sglang-router-port: 31000
+
+# -- Misc --
+attention-dropout: 0.0
+hidden-dropout: 0.0
+accumulate-allreduce-grads-in-fp32: true
+attention-softmax-in-fp32: true
+attention-backend: flash
+colocate: true
