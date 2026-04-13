@@ -106,10 +106,7 @@ RUN chmod 755 /root && \
 # OpenSage
 ARG GH_TOKEN
 RUN git clone https://${GH_TOKEN}@github.com/opensage-agent/opensage-adk.git /root/opensage \
-    && pip install --no-cache-dir --ignore-installed git+https://github.com/rucnyz/agentdocker-lite.git@main \
-    && pip install --no-cache-dir --ignore-installed --no-deps -e /root/opensage \
-    && pip install --no-cache-dir --ignore-installed google-adk litellm dacite toml \
-       pydantic-settings docker neo4j aiofiles datasets
+    && pip install --no-cache-dir --ignore-installed -e /root/opensage
 
 
 EXPOSE 2222
