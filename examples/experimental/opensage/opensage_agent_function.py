@@ -50,16 +50,20 @@ async def _get_client():
         agent_name = os.getenv("OPENSAGE_AGENT_NAME", "vul_agent_static_tools")
         benchmark_name = os.getenv("OPENSAGE_BENCHMARK_NAME", "secodeplt")
         model_name = os.getenv("AGENT_MODEL_NAME", "model")
+        dataset_path = os.getenv("OPENSAGE_DATASET_PATH", "")
 
         logger.info(
             f"Creating OpenSage client: agent={agent_name}, "
             f"benchmark={benchmark_name}, model={model_name}"
         )
-        _client = opensage.create(
+        create_kwargs: dict[str, Any] = dict(
             agent_name=agent_name,
             benchmark_name=benchmark_name,
             model_name=model_name,
         )
+        if dataset_path:
+            create_kwargs["dataset_path"] = dataset_path
+        _client = opensage.create(**create_kwargs)
         return _client
 
 

@@ -56,6 +56,8 @@ def main():
     parser.add_argument("--agent", default=os.getenv("OPENSAGE_AGENT_NAME", "vul_agent_static_tools"))
     parser.add_argument("--benchmark", default=os.getenv("OPENSAGE_BENCHMARK_NAME", "secodeplt"))
     parser.add_argument("--model-name", default=os.getenv("AGENT_MODEL_NAME", "model"))
+    parser.add_argument("--dataset-path", default=os.getenv("OPENSAGE_DATASET_PATH", ""),
+                        help="Dataset path for Evaluation (e.g. 'swebench' for harbor auto-download)")
     parser.add_argument("--skip-cleanup", action="store_true")
     # Extra args after -- are appended to training CLI (override YAML)
     args, extra = parser.parse_known_args()
@@ -90,6 +92,7 @@ def main():
         "MILES_EXPERIMENTAL_ROLLOUT_REFACTOR": "1",
         "OPENSAGE_AGENT_NAME": args.agent,
         "OPENSAGE_BENCHMARK_NAME": args.benchmark,
+        "OPENSAGE_DATASET_PATH": args.dataset_path,
         "AGENT_MODEL_NAME": args.model_name,
         "MILES_HOST_IP": os.getenv("MILES_HOST_IP", socket.gethostname()),
     }

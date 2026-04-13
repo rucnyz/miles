@@ -15,15 +15,15 @@ Miles container (GPU)                          OpenSage (in-process)
 │                                  │
 │  agentic_tool_call.generate      │           ┌────────────────────────────┐
 │    1. Create TITO session        │           │                            │
-│    2. Call opensage_agent_        │           │  opensage_agent_function   │
+│    2. Call opensage_agent_       │           │  opensage_agent_function   │
 │       function.run() ───────────────────────►│    3. Create LiteLlm       │
 │    7. Collect TITO records       │           │       (base_url → Miles)   │
 │    8. Build training samples     │           │    4. Evaluation._generate │
 │                                  │           │       _one(task)           │
 │  Miles Session Server (:30000)   │           │       └─ Agent loop        │
 │    /sessions/{id}/v1/chat/       │           │          ├─ LLM calls ─┐   │
-│      completions                 │           │          ├─ Tool calls  │   │
-│    - Proxies to SGLang engines   │◄──────────────────────────────────┘   │
+│      completions                 │           │          ├─ Tool calls │   │
+│    - Proxies to SGLang engines   │◄───────────────────────────────────┘   │
 │    - Records tokens (TITO)       │           │    5. Compute reward       │
 │                                  │           │    6. Return {reward,      │
 │  SGLang engines (1 per GPU)      │           │       exit_status,         │
