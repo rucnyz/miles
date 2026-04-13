@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=slimerl/slime:latest
+ARG BASE_IMAGE=radixark/miles:latest
 FROM ${BASE_IMAGE}
 
 RUN apt-get update && apt-get install -y docker.io
@@ -17,7 +17,7 @@ USER root
 
 # SSH key for root
 RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh
-COPY id_ed25519.pub /root/.ssh/authorized_keys
+COPY for_ssh/id_ed25519.pub /root/.ssh/authorized_keys
 RUN chmod 600 /root/.ssh/authorized_keys
 
 # Dev tools (from config/install.sh)
@@ -45,7 +45,7 @@ ARG GH_TOKEN
 # Setup for root (main user)
 RUN git config --global credential.helper store && \
     echo "https://${GH_USER}:${GH_TOKEN}@github.com" > /root/.git-credentials && \
-    git config --global --add safe.directory /root/slime
+    git config --global --add safe.directory /root/miles
 
 # tmux for root
 WORKDIR /root
@@ -84,7 +84,7 @@ RUN sed -i '/^ZSH_THEME=/c\ZSH_THEME="powerlevel10k/powerlevel10k"' ~/.zshrc && 
     echo 'source ~/.p10k.zsh' >> ~/.zshrc
 
 # zsh extras (aliases, direnv, zoxide, keybindings)
-COPY zshrc_extra.zsh /tmp/zshrc_extra.zsh
+COPY for_ssh/zshrc_extra.zsh /tmp/zshrc_extra.zsh
 RUN cat /tmp/zshrc_extra.zsh >> ~/.zshrc && rm /tmp/zshrc_extra.zsh
 
 # micro config
@@ -97,8 +97,23 @@ RUN mkdir -p ~/.config/bat && echo '--theme="Solarized (light)"' > ~/.config/bat
 # Set root's shell to zsh
 RUN chsh -s $(which zsh) root
 
-# Grant dev access to /root for claude code
-RUN chmod 755 /root
+# Grant dev full access to /root via ACL (works for both existing and future files)
+RUN apt-get update && apt-get install -y acl && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN chmod 755 /root && \
+    setfacl -R -m u:dev:rwX /root && \
+    setfacl -R -d -m u:dev:rwX /root
+
+# OpenSage dependencies (code mounted at runtime via volume)
+RUN pip install --no-cache-dir \
+    google-adk litellm datasets dacite pydantic-settings \
+    docker neo4j toml aiofiles
+
+# Pre-download SWE-Gym data
+COPY examples/experimental/swe-agent-v2/download_and_process_data.py /tmp/download_and_process_data.py
+RUN python /tmp/download_and_process_data.py --input SWE-Gym/SWE-Gym --output /root/swe.jsonl \
+    && rm /tmp/download_and_process_data.py
+
+RUN git config --global --add safe.directory /root/opensage
 
 EXPOSE 2222
 
