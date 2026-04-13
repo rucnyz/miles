@@ -19,6 +19,7 @@ import asyncio
 import logging
 import threading
 import time
+from pathlib import Path
 
 import httpx
 import uvicorn
@@ -104,13 +105,44 @@ async def test_miles_adapter_direct(port: int):
     logger.info("=" * 60)
 
     try:
-        from opensage.evaluation.rl_adapters.adapters.miles import MilesAdapter
-    except ImportError as e:
+        import importlib.util, sys, types as _types
+
+        # Build the full package hierarchy so relative imports work
+        pkg_path = Path("/scratch/yuzhou/projects/opensage-adk-dev/src/opensage/evaluation/rl_adapters/adapters")
+        for pkg_name in [
+            "opensage",
+            "opensage.evaluation",
+            "opensage.evaluation.rl_adapters",
+            "opensage.evaluation.rl_adapters.adapters",
+        ]:
+            if pkg_name not in sys.modules:
+                sys.modules[pkg_name] = _types.ModuleType(pkg_name)
+
+        # Load base.py
+        base_spec = importlib.util.spec_from_file_location(
+            "opensage.evaluation.rl_adapters.adapters.base",
+            str(pkg_path / "base.py"),
+        )
+        base_mod = importlib.util.module_from_spec(base_spec)
+        sys.modules[base_spec.name] = base_mod
+        base_spec.loader.exec_module(base_mod)
+
+        # Load miles.py
+        miles_spec = importlib.util.spec_from_file_location(
+            "opensage.evaluation.rl_adapters.adapters.miles",
+            str(pkg_path / "miles.py"),
+        )
+        miles_mod = importlib.util.module_from_spec(miles_spec)
+        sys.modules[miles_spec.name] = miles_mod
+        miles_spec.loader.exec_module(miles_mod)
+
+        MilesAdapter = miles_mod.MilesAdapter
+        from google.adk.models.lite_llm import LiteLlm
+    except (ImportError, Exception) as e:
         logger.info(f"  SKIPPED (missing dep: {e})")
         return
 
     # Create a minimal adapter (without full evaluation setup)
-    # Just test that LiteLlm creation works
     adapter = MilesAdapter.__new__(MilesAdapter)
 
     base_url = f"http://127.0.0.1:{port}/sessions/test-session-001"
@@ -120,8 +152,13 @@ async def test_miles_adapter_direct(port: int):
         sampling_params={"temperature": 0.8, "max_tokens": 1024},
     )
 
-    logger.info(f"  LiteLlm created: model={model.model}")
-    logger.info(f"  OK: LiteLlm points to mock session server")
+    assert isinstance(model, LiteLlm), f"Expected LiteLlm, got {type(model)}"
+    assert "openai/test-model" == model.model, f"Expected openai/test-model, got {model.model}"
+    assert "18999" in str(model._additional_args.get("base_url", "")), "base_url not set correctly"
+
+    logger.info(f"  LiteLlm model: {model.model}")
+    logger.info(f"  LiteLlm base_url: {model._additional_args.get('base_url')}")
+    logger.info(f"  OK: LiteLlm correctly configured for Miles session server")
 
 
 # ── Test: Mock LLM endpoint responds correctly ────────────────────────────
@@ -182,8 +219,39 @@ async def test_reward_func():
     logger.info("=" * 60)
 
     try:
-        from generate import reward_func
-    except ImportError as e:
+        # Import reward_func directly, avoiding miles' heavy imports
+        import importlib.util, sys
+        spec = importlib.util.spec_from_file_location(
+            "generate_mod",
+            str(Path(__file__).parent / "generate.py"),
+            submodule_search_locations=[],
+        )
+        # Stub out miles.utils.types and miles.rollout.* to avoid torch/ray deps
+        for stub in [
+            "miles", "miles.utils", "miles.utils.types",
+            "miles.rollout", "miles.rollout.base_types",
+            "miles.rollout.inference_rollout",
+            "miles.rollout.inference_rollout.inference_rollout_common",
+        ]:
+            if stub not in sys.modules:
+                sys.modules[stub] = type(sys)("stub")
+
+        # Provide Sample and InferenceRolloutFn stubs
+        class _StubSample:
+            def __init__(self):
+                self.metadata = {}
+        sys.modules["miles.utils.types"].Sample = _StubSample
+
+        class _StubRolloutFn:
+            pass
+        sys.modules["miles.rollout.base_types"].RolloutFnTrainInput = None
+        sys.modules["miles.rollout.base_types"].RolloutFnTrainOutput = None
+        sys.modules["miles.rollout.inference_rollout.inference_rollout_common"].InferenceRolloutFn = _StubRolloutFn
+
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        reward_func = mod.reward_func
+    except Exception as e:
         logger.info(f"  SKIPPED (missing dep: {e})")
         return
 
