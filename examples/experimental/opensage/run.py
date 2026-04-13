@@ -58,12 +58,27 @@ def main():
     parser.add_argument("--model-name", default=os.getenv("AGENT_MODEL_NAME", "model"))
     parser.add_argument("--dataset-path", default=os.getenv("OPENSAGE_DATASET_PATH", ""),
                         help="Dataset path for Evaluation (e.g. 'swebench' for harbor auto-download)")
+    parser.add_argument("--hf-checkpoint", default="zai-org/GLM-4.7-Flash",
+                        help="HuggingFace model name or local path")
+    parser.add_argument("--skip-prepare", action="store_true",
+                        help="Skip model checkpoint conversion")
     parser.add_argument("--skip-cleanup", action="store_true")
     # Extra args after -- are appended to training CLI (override YAML)
     args, extra = parser.parse_known_args()
 
     if not args.skip_cleanup:
         cleanup()
+
+    # Auto-convert HF checkpoint to Megatron format (skips if already done)
+    if not args.skip_prepare:
+        import miles.utils.external_utils.command_utils as U
+        U.convert_checkpoint(
+            model_name=Path(args.hf_checkpoint).name,
+            megatron_model_type="glm4.7-flash",
+            num_gpus_per_node=args.num_gpus,
+            hf_checkpoint=args.hf_checkpoint,
+            megatron_path=args.megatron_path,
+        )
 
     # Build training CLI args from YAML + overrides
     train_args = parse_yaml_to_args(args.config)
