@@ -4,11 +4,6 @@ Custom agent function and reward for Miles <-> OpenSage integration.
 Usage in run.py:
     --custom-agent-function-path opensage_agent_function.run
     --custom-rm-path opensage_agent_function.reward_func
-
-Environment variables:
-    OPENSAGE_AGENT_NAME:     Agent name (default: vul_agent_static_tools)
-    OPENSAGE_BENCHMARK_NAME: Benchmark name (default: secodeplt)
-    AGENT_MODEL_NAME:        Model name for the agent (default: model)
 """
 
 import asyncio

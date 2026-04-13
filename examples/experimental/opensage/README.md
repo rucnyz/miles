@@ -33,73 +33,61 @@ Miles container (GPU)                          OpenSage (in-process)
 └──────────────────────────────────┘
 ```
 
-### Key difference from swe-agent-v2 (Harbor)
-
-| | swe-agent-v2 | opensage |
-|---|---|---|
-| Agent runtime | Separate container (agent_env) | In-process (same container as Miles) |
-| Agent server | server.py (FastAPI, port 11000) | Direct Python call (no HTTP) |
-| Token tracking | Miles TITO (external) | Miles TITO (external) |
-| Sandbox | Harbor Docker containers | OpenSage Docker sandboxes |
-| Grading | Harbor test.sh + verifier | OpenSage Evaluation.reward_func() |
-
 ## Files
 
 | File | Description |
 | --- | --- |
-| `opensage_agent_function.py` | Custom agent function — bridges Miles to OpenSage evaluation |
-| `generate.py` | Reward function, agent metrics aggregation, `RolloutFn` |
-| `run.py` | Training launcher — handles Ray lifecycle, model loading, and job submission |
+| `opensage_agent_function.py` | Agent function + reward_func — bridges Miles to OpenSage |
+| `run.py` | Training launcher — reads YAML config, sets up env, launches training |
+| `configs/default.yaml` | Full training parameters |
+| `configs/debug.yaml` | Debug mode (small batch) |
 | `example.py` | Smoke test with mock session server |
 
-On the OpenSage side:
+## Usage
 
-| File | Description |
-| --- | --- |
-| `adapters/miles.py` | MilesAdapter — creates LiteLlm, runs agent, returns reward |
-| `client.py` | `miles_generate()` method on RLSession |
-
-## Setup
-
-### Prerequisites
-
-- Miles container with GPU support (nvidia-container-toolkit)
-- OpenSage installed (`pip install -e /path/to/opensage-adk-dev`)
-- Model weights downloaded (e.g. `zai-org/GLM-4.7-Flash`)
-- Model converted to Megatron format (see swe-agent-v2 Step 6)
-
-### Step 1: Prepare data
-
-```bash
-# Inside miles container
-cd /root/miles/examples/experimental/swe-agent-v2
-python download_and_process_data.py --input SWE-Gym/SWE-Gym --output /root/swe.jsonl
-```
-
-### Step 2: Run training
+### Run training
 
 ```bash
 cd /root/miles/examples/experimental/opensage
 
-# Debug mode (quick pipeline verification)
-python run.py --mode debug_rollout_only \
-  --prompt-data /root/swe.jsonl \
-  --num-gpus-per-node 8
+# SeCodePLT benchmark
+python run.py --config configs/default.yaml \
+  --benchmark secodeplt --agent vul_agent_static_tools
 
-# Full training
-python run.py \
-  --prompt-data /root/swe.jsonl \
-  --num-gpus-per-node 8
+# Harbor benchmark (auto-downloads from harbor registry)
+python run.py --config configs/default.yaml \
+  --benchmark harbor --agent harbor_agent --dataset-path swebench
+
+# Harbor benchmark (local task directory)
+python run.py --config configs/default.yaml \
+  --benchmark harbor --agent harbor_agent --dataset-path /data/my_tasks
+
+# Debug mode
+python run.py --config configs/debug.yaml \
+  --benchmark harbor --agent harbor_agent --dataset-path swebench
 ```
 
-### Environment variables
+### CLI options
 
-| Variable | Default | Description |
+| Option | Default | Description |
 | --- | --- | --- |
-| `OPENSAGE_AGENT_NAME` | `vul_agent_static_tools` | OpenSage agent name |
-| `OPENSAGE_BENCHMARK_NAME` | `secodeplt` | Benchmark for reward computation |
-| `AGENT_MODEL_NAME` | `model` | Model name passed to the agent |
-| `MILES_HOST_IP` | `$(hostname)` | IP/hostname for inter-process communication |
+| `--config` | (required) | YAML config file for training parameters |
+| `--benchmark` | `secodeplt` | OpenSage benchmark name |
+| `--agent` | `vul_agent_static_tools` | OpenSage agent name |
+| `--dataset-path` | (empty) | Dataset path — local dir or harbor registry name |
+| `--model-name` | `model` | Model name passed to the agent |
+| `--num-gpus` | `8` | Number of GPUs |
+
+### Supported benchmarks
+
+| Benchmark | `--benchmark` | `--dataset-path` | Description |
+| --- | --- | --- | --- |
+| SeCodePLT | `secodeplt` | (not needed) | Vulnerability detection, auto-downloads from HuggingFace |
+| SWE-Bench Pro | `swe_bench_pro` | (not needed) | Software engineering, auto-downloads from HuggingFace |
+| CyberGym | `cybergym` | (not needed) | Cybersecurity challenges |
+| Harbor tasks | `harbor` | `swebench`, `compilebench`, etc. | Any of 60+ Harbor benchmarks |
+
+Harbor tasks are auto-downloaded from the harbor registry to `~/.cache/harbor/tasks/`. You can also point `--dataset-path` at a local directory of pre-generated Harbor task directories.
 
 ## How It Works
 
