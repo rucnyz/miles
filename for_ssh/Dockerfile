@@ -103,17 +103,16 @@ RUN chmod 755 /root && \
     setfacl -R -m u:dev:rwX /root && \
     setfacl -R -d -m u:dev:rwX /root
 
-# OpenSage dependencies (code mounted at runtime via volume)
-RUN pip install --no-cache-dir \
-    google-adk litellm datasets dacite pydantic-settings \
-    docker neo4j toml aiofiles
+# OpenSage
+ARG GH_TOKEN
+RUN git clone https://${GH_TOKEN}@github.com/opensage-agent/opensage-adk.git /root/opensage \
+    && pip install --no-cache-dir -e /root/opensage
 
 # Pre-download SWE-Gym data
 COPY examples/experimental/swe-agent-v2/download_and_process_data.py /tmp/download_and_process_data.py
 RUN python /tmp/download_and_process_data.py --input SWE-Gym/SWE-Gym --output /root/swe.jsonl \
     && rm /tmp/download_and_process_data.py
 
-RUN git config --global --add safe.directory /root/opensage
 
 EXPOSE 2222
 

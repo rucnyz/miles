@@ -9,17 +9,11 @@ docker compose up --build
 # 或者自定义 SSH 端口
 SSH_PORT=2224 docker compose up --build
 
-# 如果 opensage 代码不在默认位置 (../../opensage-adk-dev)
-OPENSAGE_DIR=/path/to/opensage-adk-dev SSH_PORT=2224 docker compose up --build
 ```
 
 构建时自动完成：
-- OpenSage 依赖安装（google-adk, litellm 等）
+- OpenSage clone + 安装（`/root/opensage`）
 - SWE-Gym 数据下载并转换为 Miles 格式（`/root/swe.jsonl`）
-
-运行时自动挂载：
-- Miles 代码 → `/root/miles`
-- OpenSage 代码 → `/root/opensage`（PYTHONPATH 已配置）
 
 ## Training
 
