@@ -3,47 +3,33 @@
 Usage:
     python run.py --config configs/default.yaml
     python run.py --config configs/debug.yaml
-    python run.py --config configs/default.yaml --prompt-data /root/my_data.jsonl
+    python run.py --config configs/default.yaml --dataset-path swebench --benchmark harbor
 """
 
 import os
 import socket
-import subprocess
-import sys
-import time
 from pathlib import Path
 
 import yaml
 
+import miles.utils.external_utils.command_utils as U
+
 SCRIPT_DIR = Path(__file__).resolve().parent
-MILES_ROOT = SCRIPT_DIR.parents[2]  # examples/experimental/opensage -> miles root
 
 
-def parse_yaml_to_args(config_path: str) -> list[str]:
-    """Convert YAML config to CLI args list."""
+def parse_yaml_to_args(config_path: str) -> str:
+    """Convert YAML config to CLI args string."""
     cfg = yaml.safe_load(Path(config_path).read_text())
     if not cfg:
-        return []
-    args = []
+        return ""
+    parts = []
     for k, v in cfg.items():
         if isinstance(v, bool):
             if v:
-                args.append(f"--{k}")
+                parts.append(f"--{k}")
         else:
-            args.extend([f"--{k}", str(v)])
-    return args
-
-
-def cleanup():
-    """Kill stale sglang/ray processes to free GPUs."""
-    pid, ppid = os.getpid(), os.getppid()
-    for target in ["sglang", "train.py", "MegatronTrain"]:
-        subprocess.run(
-            f"pgrep -f '{target}' | grep -v '^{pid}$' | grep -v '^{ppid}$' "
-            f"| xargs -r kill 2>/dev/null || true",
-            shell=True,
-        )
-    time.sleep(5)
+            parts.append(f"--{k} {v}")
+    return " ".join(parts)
 
 
 def main():
@@ -62,16 +48,10 @@ def main():
                         help="HuggingFace model name or local path")
     parser.add_argument("--skip-prepare", action="store_true",
                         help="Skip model checkpoint conversion")
-    parser.add_argument("--skip-cleanup", action="store_true")
-    # Extra args after -- are appended to training CLI (override YAML)
-    args, extra = parser.parse_known_args()
-
-    if not args.skip_cleanup:
-        cleanup()
+    args, extra_args = parser.parse_known_args()
 
     # Auto-convert HF checkpoint to Megatron format (skips if already done)
     if not args.skip_prepare:
-        import miles.utils.external_utils.command_utils as U
         U.convert_checkpoint(
             model_name=Path(args.hf_checkpoint).name,
             megatron_model_type="glm4.7-flash",
@@ -80,30 +60,29 @@ def main():
             megatron_path=args.megatron_path,
         )
 
-    # Build training CLI args from YAML + overrides
+    # Build training args: YAML config + extra CLI overrides
     train_args = parse_yaml_to_args(args.config)
-    train_args.extend(extra)
+    if extra_args:
+        train_args += " " + " ".join(extra_args)
 
-    # OpenSage-specific agent args (always appended)
-    train_args.extend([
-        "--custom-generate-function-path", "miles.rollout.generate_hub.agentic_tool_call.generate",
-        "--custom-agent-function-path", "opensage_agent_function.run",
-        "--custom-rm-path", "opensage_agent_function.reward_func",
-        "--tito-model", "glm47",
-        "--chat-template-path", "autofix",
-        "--use-session-server",
-        "--session-server-port", "30000",
-        "--generate-multi-samples",
-        "--dynamic-sampling-filter-path", "miles.rollout.filter_hub.dynamic_sampling_filters.check_no_aborted",
-        "--actor-num-nodes", "1",
-        "--actor-num-gpus-per-node", str(args.num_gpus),
-        "--rollout-num-gpus", str(args.num_gpus),
-    ])
+    # OpenSage-specific agent args
+    train_args += (
+        " --custom-generate-function-path miles.rollout.generate_hub.agentic_tool_call.generate"
+        " --custom-agent-function-path opensage_agent_function.run"
+        " --custom-rm-path opensage_agent_function.reward_func"
+        " --tito-model glm47"
+        " --chat-template-path autofix"
+        " --use-session-server"
+        " --session-server-port 30000"
+        " --generate-multi-samples"
+        " --dynamic-sampling-filter-path miles.rollout.filter_hub.dynamic_sampling_filters.check_no_aborted"
+        f" --actor-num-nodes 1"
+        f" --actor-num-gpus-per-node {args.num_gpus}"
+        f" --rollout-num-gpus {args.num_gpus}"
+    )
 
-    # Environment
-    env = {
-        **os.environ,
-        "PYTHONPATH": f"{args.megatron_path}:{SCRIPT_DIR}:{MILES_ROOT}",
+    extra_env_vars = {
+        "PYTHONPATH": f"{args.megatron_path}:{SCRIPT_DIR}:{U.repo_base_dir}",
         "MILES_EXPERIMENTAL_ROLLOUT_REFACTOR": "1",
         "OPENSAGE_AGENT_NAME": args.agent,
         "OPENSAGE_BENCHMARK_NAME": args.benchmark,
@@ -112,15 +91,13 @@ def main():
         "MILES_HOST_IP": os.getenv("MILES_HOST_IP", socket.gethostname()),
     }
 
-    # Launch via miles train CLI
-    cmd = [
-        sys.executable, "-m", "miles.cli.train",
-        "--megatron-model-type", "glm4.7-flash",
-        *train_args,
-    ]
-
-    print(f"Launching: {' '.join(cmd[:6])} ... ({len(train_args)} args)")
-    subprocess.run(cmd, env=env, check=True)
+    U.execute_train(
+        train_args=train_args,
+        num_gpus_per_node=args.num_gpus,
+        megatron_model_type="glm4.7-flash",
+        megatron_path=args.megatron_path,
+        extra_env_vars=extra_env_vars,
+    )
 
 
 if __name__ == "__main__":
