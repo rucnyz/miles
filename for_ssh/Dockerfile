@@ -105,7 +105,7 @@ RUN chmod 755 /root && \
 
 # OpenSage
 ARG GH_TOKEN
-RUN git clone https://${GH_TOKEN}@github.com/opensage-agent/opensage-adk.git /root/opensage \
+RUN git clone https://${GH_TOKEN}@github.com/opensage-agent/opensage-adk-dev.git /root/opensage \
     && pip install --no-cache-dir --ignore-installed -e /root/opensage
 
 
