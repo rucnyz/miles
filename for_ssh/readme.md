@@ -13,7 +13,7 @@ SSH_PORT=2224 docker compose up --build
 
 构建时自动完成：
 - OpenSage clone + 安装（`/root/opensage`）
-- SWE-Gym 数据下载并转换为 Miles 格式（`/root/swe.jsonl`）
+- Benchmark 数据在训练时按需自动从 HuggingFace 下载
 
 ## Training
 
@@ -57,18 +57,6 @@ python run.py --config configs/default.yaml --prompt-data /root/my_data.jsonl --
 ray job logs <JOB_ID> --follow
 ```
 
-### 准备自定义数据（可选）
-
-```shell
-cd /root/miles/examples/experimental/swe-agent-v2
-
-# 处理本地数据
-python download_and_process_data.py --input /data/tb.jsonl --output /root/tb.jsonl \
-  --agent-name terminus-2 --prompt-key instruction
-
-# 合并为混合数据集
-cat /root/swe.jsonl /root/tb.jsonl > /root/mixed.jsonl
-```
 
 ## Deprecated
 ```shell
